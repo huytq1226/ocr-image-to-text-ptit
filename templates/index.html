@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Image to Text</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #e0eafc, #cfdef3 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin-top: 40px;
+        }
+        .card {
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+        .drop-zone {
+            border: 2px dashed #0d6efd;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            color: #0d6efd;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .drop-zone.dragover {
+            background: #e7f1ff;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            margin-top: 10px;
+        }
+        .result-text {
+            margin-top: 20px;
+            padding: 18px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            min-height: 120px;
+            font-size: 1.1rem;
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 2;
+        }
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+        @media (max-width: 767px) {
+            .row {
+                flex-direction: column;
+            }
+            .preview-image {
+                max-height: 180px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold"><i class="fa-solid fa-image"></i> OCR Image to Text</h1>
+            <p class="text-secondary">Chuyển đổi hình ảnh thành văn bản tiếng Việt/Anh dễ dàng!</p>
+        </div>
+        <div id="alertBox" class="alert d-none" role="alert"></div>
+        <div class="card p-4">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="drop-zone mb-3" id="dropZone">
+                    <i class="fa-solid fa-cloud-arrow-up fa-2x mb-2"></i>
+                    <div>Kéo & thả ảnh vào đây hoặc <span class="text-primary fw-bold">chọn ảnh</span></div>
+                    <input type="file" class="form-control d-none" id="imageFile" accept="image/*" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="fa-solid fa-magic"></i> Chuyển đổi</button>
+            </form>
+            <div class="loading text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Đang xử lý...</p>
+            </div>
+            <div class="row mt-4 g-4">
+                <div class="col-md-6">
+                    <h6 class="fw-semibold">Ảnh gốc:</h6>
+                    <img id="originalImage" class="preview-image d-none">
+                </div>
+                <div class="col-md-6">
+                    <h6 class="fw-semibold">Ảnh đã xử lý:</h6>
+                    <img id="processedImage" class="preview-image d-none">
+                </div>
+            </div>
+            <div class="result-text mt-4 d-none" id="resultTextBox">
+                <button class="btn btn-outline-secondary btn-sm copy-btn" id="copyBtn" title="Copy"><i class="fa-regular fa-copy"></i></button>
+                <pre id="resultText" class="mb-0" style="white-space: pre-wrap; background: none; border: none;"></pre>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Drag & Drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('imageFile');
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                showOriginalImage();
+            }
+        });
+        fileInput.addEventListener('change', showOriginalImage);
+        function showOriginalImage() {
+            const file = fileInput.files[0];
+            if (file) {
+                const originalImage = document.getElementById('originalImage');
+                originalImage.src = URL.createObjectURL(file);
+                originalImage.classList.remove('d-none');
+            }
+        }
+        // Form submit
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) {
+                showAlert('Vui lòng chọn một file ảnh!', 'danger');
+                return;
+            }
+            document.querySelector('.loading').style.display = 'block';
+            document.getElementById('resultTextBox').classList.add('d-none');
+            document.getElementById('processedImage').classList.add('d-none');
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.error) {
+                    showAlert('Lỗi: ' + data.error, 'danger');
+                    return;
+                }
+                document.getElementById('resultText').textContent = data.text_corrected || data.text || '';
+                document.getElementById('resultTextBox').classList.remove('d-none');
+                document.getElementById('processedImage').src = data.processed_image;
+                document.getElementById('processedImage').classList.remove('d-none');
+                showAlert('Chuyển đổi thành công!', 'success');
+            } catch (error) {
+                showAlert('Có lỗi xảy ra: ' + error.message, 'danger');
+            } finally {
+                document.querySelector('.loading').style.display = 'none';
+            }
+        });
+        // Copy kết quả
+        document.getElementById('copyBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const text = document.getElementById('resultText').textContent;
+            navigator.clipboard.writeText(text);
+            showAlert('Đã copy kết quả vào clipboard!', 'info');
+        });
+        // Alert helper
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type}`;
+            alertBox.classList.remove('d-none');
+            setTimeout(() => alertBox.classList.add('d-none'), 3500);
+        }
+    </script>
+</body>
+</html> 
