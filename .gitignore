@@ -46,4 +46,4 @@ Thumbs.db
 *.sw?
 
 # Static files uploads (if you don't want to version control them)
-static/uploads/
+# static/uploads/
