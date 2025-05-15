@@ -10,6 +10,8 @@ import base64
 import jiwer
 import pandas as pd
 import easyocr
+from typing import Dict, List, Tuple, Optional
+import json
 
 app = Flask(__name__)
 
@@ -20,11 +22,14 @@ os.environ['TESSDATA_PREFIX'] = r'C:\Program Files\Tesseract-OCR\tessdata'
 # Cấu hình thư mục
 UPLOAD_FOLDER = 'static/uploads'
 INTERMEDIATE_FOLDER = 'static/intermediate'
-for folder in [UPLOAD_FOLDER, INTERMEDIATE_FOLDER]:
+RESULTS_FOLDER = 'results'
+for folder in [UPLOAD_FOLDER, INTERMEDIATE_FOLDER, RESULTS_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['INTERMEDIATE_FOLDER'] = INTERMEDIATE_FOLDER
+app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
+
 # Khởi tạo EasyOCR
 reader = easyocr.Reader(['vi', 'en'])
 
@@ -33,6 +38,179 @@ vietocr_config = Cfg.load_config_from_name('vgg_transformer')
 vietocr_config['device'] = 'cpu'  # Hoặc 'cuda' nếu có GPU
 vietocr_predictor = Predictor(vietocr_config)
 
+def perform_easyocr(image: np.ndarray, config: Dict) -> str:
+    """
+    Thực hiện OCR với EasyOCR với các tham số tùy chỉnh.
+    
+    Args:
+        image: Ảnh đầu vào dạng numpy array
+        config: Dict chứa các tham số cấu hình
+        
+    Returns:
+        str: Văn bản được nhận dạng
+    """
+    result = reader.readtext(
+        image,
+        detail=0,
+        paragraph=config.get('paragraph', True),
+        text_threshold=config.get('text_threshold', 0.5),
+        low_text=config.get('low_text', 0.4),
+        decoder=config.get('decoder', 'greedy')
+    )
+    return '\n'.join(result)
+
+def perform_tesseract(image: np.ndarray) -> str:
+    """
+    Thực hiện OCR với Tesseract.
+    
+    Args:
+        image: Ảnh đầu vào dạng numpy array
+        
+    Returns:
+        str: Văn bản được nhận dạng
+    """
+    return pytesseract.image_to_string(image, lang='vie+eng')
+
+def perform_vietocr(image: np.ndarray) -> str:
+    """
+    Thực hiện OCR với VietOCR.
+    
+    Args:
+        image: Ảnh đầu vào dạng numpy array
+        
+    Returns:
+        str: Văn bản được nhận dạng
+    """
+    pil_image = Image.fromarray(image)
+    return vietocr_predictor.predict(pil_image)
+
+def evaluate_ocr(predicted: str, ground_truth: str) -> Dict[str, float]:
+    """
+    Đánh giá kết quả OCR so với ground truth.
+    
+    Args:
+        predicted: Văn bản được dự đoán
+        ground_truth: Văn bản thực tế
+        
+    Returns:
+        Dict chứa CER và WER
+    """
+    measures = jiwer.compute_measures(ground_truth, predicted)
+    return {
+        'cer': measures['substitutions'] + measures['deletions'] + measures['insertions'],
+        'wer': measures['wer']
+    }
+
+def hybrid_ocr(image: np.ndarray, ground_truth: Optional[str] = None) -> Dict:
+    """
+    Thực hiện OCR với nhiều mô hình và chọn kết quả tốt nhất.
+    
+    Args:
+        image: Ảnh đầu vào
+        ground_truth: Văn bản thực tế (tùy chọn)
+        
+    Returns:
+        Dict chứa kết quả của tất cả mô hình và đánh giá
+    """
+    # Cấu hình EasyOCR
+    easyocr_configs = [
+        {'text_threshold': 0.5, 'low_text': 0.4, 'paragraph': True, 'decoder': 'greedy'},
+        {'text_threshold': 0.7, 'low_text': 0.4, 'paragraph': True, 'decoder': 'greedy'},
+        {'text_threshold': 0.9, 'low_text': 0.4, 'paragraph': True, 'decoder': 'greedy'},
+        {'text_threshold': 0.7, 'low_text': 0.4, 'paragraph': False, 'decoder': 'beamsearch'}
+    ]
+    
+    # Thực hiện OCR với các mô hình
+    results = {
+        'tesseract': perform_tesseract(image),
+        'vietocr': perform_vietocr(image),
+        'easyocr': {}
+    }
+    
+    # Thử nghiệm các cấu hình EasyOCR
+    for i, config in enumerate(easyocr_configs):
+        config_name = f'config_{i+1}'
+        results['easyocr'][config_name] = perform_easyocr(image, config)
+    
+    # Đánh giá nếu có ground truth
+    evaluation = None
+    if ground_truth:
+        evaluation = {
+            'tesseract': evaluate_ocr(results['tesseract'], ground_truth),
+            'vietocr': evaluate_ocr(results['vietocr'], ground_truth),
+            'easyocr': {}
+        }
+        
+        for config_name, text in results['easyocr'].items():
+            evaluation['easyocr'][config_name] = evaluate_ocr(text, ground_truth)
+    
+    # Chọn kết quả tốt nhất (dựa trên độ dài văn bản)
+    all_texts = [results['tesseract'], results['vietocr']] + list(results['easyocr'].values())
+    best_text = max(all_texts, key=len)
+    
+    return {
+        'best_text': best_text,
+        'all_results': results,
+        'evaluation': evaluation
+    }
+
+def test_ocr_models(image: np.ndarray, ground_truth: str) -> None:
+    """
+    Thử nghiệm các mô hình OCR và lưu kết quả vào CSV.
+    
+    Args:
+        image: Ảnh đầu vào
+        ground_truth: Văn bản thực tế
+    """
+    try:
+        results = hybrid_ocr(image, ground_truth)
+        
+        # Chuẩn bị dữ liệu cho CSV
+        data = []
+        for model, text in results['all_results'].items():
+            if model == 'easyocr':
+                for config_name, config_text in text.items():
+                    eval_data = results['evaluation'][model][config_name]
+                    data.append({
+                        'model': f'easyocr_{config_name}',
+                        'text': config_text,
+                        'cer': eval_data['cer'],
+                        'wer': eval_data['wer'],
+                        'timestamp': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
+                    })
+            else:
+                eval_data = results['evaluation'][model]
+                data.append({
+                    'model': model,
+                    'text': text,
+                    'cer': eval_data['cer'],
+                    'wer': eval_data['wer'],
+                    'timestamp': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+        
+        # Tạo DataFrame
+        df = pd.DataFrame(data)
+        
+        # Đảm bảo thư mục results tồn tại
+        results_dir = app.config['RESULTS_FOLDER']
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        
+        # Đường dẫn file CSV
+        csv_path = os.path.join(results_dir, 'ocr_results.csv')
+        
+        # Kiểm tra xem file đã tồn tại chưa
+        if os.path.exists(csv_path):
+            # Nếu file đã tồn tại, thêm dữ liệu mới
+            df.to_csv(csv_path, mode='a', header=False, index=False)
+        else:
+            # Nếu file chưa tồn tại, tạo file mới với header
+            df.to_csv(csv_path, mode='w', header=True, index=False)
+            
+        print(f"Đã lưu kết quả vào {csv_path}")
+    except Exception as e:
+        print(f"Lỗi khi lưu kết quả: {str(e)}")
+        raise
 
 def analyze_image(image):
     """Phân tích đặc điểm ảnh: độ sáng trung bình và độ tương phản."""
@@ -125,8 +303,6 @@ def preprocess_image_for_easyocr(image):
     return image
 
 
-
-
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -146,7 +322,7 @@ def upload_file():
             img = Image.open(file.stream)
             img_np = np.array(img)
             
-            # Tiền xử lý ảnh cho EasyOCR
+            # Tiền xử lý ảnh cho OCR
             processed_img = preprocess_image_for_easyocr(img_np)
             
             # Tiền xử lý ảnh cho báo cáo (với lưu kết quả trung gian)
@@ -154,9 +330,15 @@ def upload_file():
                 img_np, intermediate_save_path=app.config['INTERMEDIATE_FOLDER']
             )
             
-            # Thực hiện OCR với EasyOCR
-            result = reader.readtext(processed_img, detail=0, paragraph=True)
-            text = '\n'.join(result)
+            # Lấy ground truth nếu có
+            ground_truth = request.form.get('ground_truth')
+            
+            # Thực hiện hybrid OCR
+            ocr_results = hybrid_ocr(processed_img, ground_truth)
+            
+            # Lưu kết quả vào CSV nếu có ground truth
+            if ground_truth:
+                test_ocr_models(processed_img, ground_truth)
             
             # Tạo tên file duy nhất
             filename = f"processed_{file.filename}"
@@ -173,12 +355,15 @@ def upload_file():
             ]
             
             return jsonify({
-                'text': text,
+                'best_text': ocr_results['best_text'],
+                'all_results': ocr_results['all_results'],
+                'evaluation': ocr_results['evaluation'],
                 'processed_image': processed_image_url,
                 'intermediate_images': intermediate_urls
             })
         except Exception as e:
             return jsonify({'error': str(e)})
+        
 
 if __name__ == '__main__':
     app.run(debug=True) 

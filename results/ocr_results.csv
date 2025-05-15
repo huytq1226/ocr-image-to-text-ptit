@@ -1,0 +1,89 @@
+model,text,cer,wer
+tesseract,"ng dẫn chụp
+nh ban:
+thoại dé d
+ing
+
+dién
+
+",14,0.9333333333333333
+vietocr,SELL,15,1.0
+easyocr_config_1,Hưỡng dẫn chụp ảnh bằng điện thoại để dịch xiếng nưởc ngoài tiêng việt,4,0.26666666666666666
+easyocr_config_2,Hưỡng dẫn chụp ảnh bằng điện thoại để dịch xiếng nưởc ngoài tiêng việt,4,0.26666666666666666
+easyocr_config_3,Hưỡng dẫn chụp ảnh bằng điện thoai dịch xiếng nưởc ngoài tiêng,7,0.4666666666666667
+easyocr_config_4,"Hưỡng dẫn
+ảnh
+điện
+thoại để dịch
+nưởc ngoài
+việt
+chụp
+bằng
+xiếng
+tiêng",13,0.8666666666666667
+tesseract,,1,1.0
+vietocr,22,0,0.0
+easyocr_config_1,"F
+0 s 9 5",4,4.0
+easyocr_config_2,0 9 5,3,3.0
+easyocr_config_3,,1,1.0
+easyocr_config_4,"0
+9
+5",1,1.0
+tesseract,,1,1.0
+vietocr,WASHINGTON,0,0.0
+easyocr_config_1,WASHINCTON,1,1.0
+easyocr_config_2,WASHINCTON,1,1.0
+easyocr_config_3,WASHINCTON,1,1.0
+easyocr_config_4,WASHINCTON,1,1.0
+tesseract,,1,1.0
+vietocr,postgrad,0,0.0
+easyocr_config_1,postgrad,0,0.0
+easyocr_config_2,postgrad,0,0.0
+easyocr_config_3,postgrad,0,0.0
+easyocr_config_4,postgrad,0,0.0
+tesseract,,1,1.0
+vietocr,study,0,0.0
+easyocr_config_1,study,0,0.0
+easyocr_config_2,study,0,0.0
+easyocr_config_3,study,0,0.0
+easyocr_config_4,study,0,0.0
+tesseract,,1,1.0
+vietocr,WAWS,1,1.0
+easyocr_config_1,,1,1.0
+easyocr_config_2,,1,1.0
+easyocr_config_3,,1,1.0
+easyocr_config_4,,1,1.0
+tesseract,,1,1.0,2025-05-15 16:41:20
+vietocr,22,0,0.0,2025-05-15 16:41:20
+easyocr_config_1,"F
+0 s 9 5",4,4.0,2025-05-15 16:41:20
+easyocr_config_2,0 9 5,3,3.0,2025-05-15 16:41:20
+easyocr_config_3,,1,1.0,2025-05-15 16:41:20
+easyocr_config_4,"0
+9
+5",1,1.0,2025-05-15 16:41:20
+tesseract,,1,1.0,2025-05-15 16:41:37
+vietocr,postgrad,0,0.0,2025-05-15 16:41:37
+easyocr_config_1,postgrad,0,0.0,2025-05-15 16:41:37
+easyocr_config_2,postgrad,0,0.0,2025-05-15 16:41:37
+easyocr_config_3,postgrad,0,0.0,2025-05-15 16:41:37
+easyocr_config_4,postgrad,0,0.0,2025-05-15 16:41:37
+tesseract,,1,1.0,2025-05-15 16:41:56
+vietocr,study,0,0.0,2025-05-15 16:41:56
+easyocr_config_1,study,0,0.0,2025-05-15 16:41:56
+easyocr_config_2,study,0,0.0,2025-05-15 16:41:56
+easyocr_config_3,study,0,0.0,2025-05-15 16:41:56
+easyocr_config_4,study,0,0.0,2025-05-15 16:41:56
+tesseract,,1,1.0,2025-05-15 16:42:11
+vietocr,WAWS,1,1.0,2025-05-15 16:42:11
+easyocr_config_1,,1,1.0,2025-05-15 16:42:11
+easyocr_config_2,,1,1.0,2025-05-15 16:42:11
+easyocr_config_3,,1,1.0,2025-05-15 16:42:11
+easyocr_config_4,,1,1.0,2025-05-15 16:42:11
+tesseract,,1,1.0,2025-05-15 16:42:40
+vietocr,prospects,0,0.0,2025-05-15 16:42:40
+easyocr_config_1,nrosnects,1,1.0,2025-05-15 16:42:40
+easyocr_config_2,nrosnects,1,1.0,2025-05-15 16:42:40
+easyocr_config_3,nrosnects,1,1.0,2025-05-15 16:42:40
+easyocr_config_4,nrosnects,1,1.0,2025-05-15 16:42:40

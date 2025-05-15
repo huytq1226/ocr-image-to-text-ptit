@@ -102,6 +102,18 @@
               required
             />
           </div>
+          <div class="mb-3">
+            <label for="groundTruth" class="form-label"
+              >Ground Truth (tùy chọn)</label
+            >
+            <textarea
+              class="form-control"
+              id="groundTruth"
+              name="ground_truth"
+              rows="3"
+              placeholder="Nhập văn bản thực tế để đánh giá kết quả OCR"
+            ></textarea>
+          </div>
           <button type="submit" class="btn btn-primary w-100 fw-bold">
             <i class="fa-solid fa-magic"></i> Chuyển đổi
           </button>
@@ -133,19 +145,69 @@
             <img id="processedImage" class="preview-image d-none" />
           </div>
         </div>
-        <div class="result-text mt-4 d-none" id="resultTextBox">
-          <button
-            class="btn btn-outline-secondary btn-sm copy-btn"
-            id="copyBtn"
-            title="Copy"
-          >
-            <i class="fa-regular fa-copy"></i>
-          </button>
-          <pre
-            id="resultText"
-            class="mb-0"
-            style="white-space: pre-wrap; background: none; border: none"
-          ></pre>
+        <div class="mt-4">
+          <h6 class="fw-semibold mb-3">Kết quả OCR:</h6>
+          <div class="accordion" id="ocrResults">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#bestResult"
+                >
+                  Kết quả tốt nhất
+                </button>
+              </h2>
+              <div
+                id="bestResult"
+                class="accordion-collapse collapse show"
+                data-bs-parent="#ocrResults"
+              >
+                <div class="accordion-body">
+                  <div class="result-text position-relative">
+                    <button
+                      class="btn btn-outline-secondary btn-sm copy-btn"
+                      onclick="copyText('bestText')"
+                      title="Copy"
+                    >
+                      <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <pre
+                      id="bestText"
+                      class="mb-0"
+                      style="
+                        white-space: pre-wrap;
+                        background: none;
+                        border: none;
+                      "
+                    ></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#allResults"
+                >
+                  Tất cả kết quả
+                </button>
+              </h2>
+              <div
+                id="allResults"
+                class="accordion-collapse collapse"
+                data-bs-parent="#ocrResults"
+              >
+                <div class="accordion-body">
+                  <div id="allResultsContent"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -189,11 +251,15 @@
             return;
           }
           document.querySelector(".loading").style.display = "block";
-          document.getElementById("resultTextBox").classList.add("d-none");
-          document.getElementById("processedImage").classList.add("d-none");
+          document.getElementById("bestText").textContent = "";
+          document.getElementById("allResultsContent").innerHTML = "";
           try {
             const formData = new FormData();
             formData.append("file", file);
+            const groundTruth = document.getElementById("groundTruth").value;
+            if (groundTruth) {
+              formData.append("ground_truth", groundTruth);
+            }
             const response = await fetch("/upload", {
               method: "POST",
               body: formData,
@@ -203,9 +269,84 @@
               showAlert("Lỗi: " + data.error, "danger");
               return;
             }
-            document.getElementById("resultText").textContent =
-              data.text_corrected || data.text || "";
-            document.getElementById("resultTextBox").classList.remove("d-none");
+
+            // Hiển thị kết quả tốt nhất
+            document.getElementById("bestText").textContent = data.best_text;
+
+            // Hiển thị tất cả kết quả
+            const allResultsContent =
+              document.getElementById("allResultsContent");
+            for (const [model, result] of Object.entries(data.all_results)) {
+              const resultDiv = document.createElement("div");
+              resultDiv.className = "mb-4";
+
+              if (model === "easyocr") {
+                resultDiv.innerHTML = `
+                  <h6 class="fw-semibold mb-2">EasyOCR Configurations:</h6>
+                  ${Object.entries(result)
+                    .map(
+                      ([config, text]) => `
+                    <div class="mb-3">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted">${config}</small>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="copyText('${model}_${config}')" title="Copy">
+                          <i class="fa-regular fa-copy"></i>
+                        </button>
+                      </div>
+                      <div class="result-text">
+                        <pre id="${model}_${config}" class="mb-0" style="white-space: pre-wrap; background: none; border: none">${text}</pre>
+                      </div>
+                      ${
+                        data.evaluation
+                          ? `
+                        <div class="mt-1">
+                          <small class="text-muted">
+                            CER: ${(
+                              data.evaluation[model][config].cer * 100
+                            ).toFixed(2)}% | 
+                            WER: ${(
+                              data.evaluation[model][config].wer * 100
+                            ).toFixed(2)}%
+                          </small>
+                        </div>
+                      `
+                          : ""
+                      }
+                    </div>
+                  `
+                    )
+                    .join("")}
+                `;
+              } else {
+                resultDiv.innerHTML = `
+                  <h6 class="fw-semibold mb-2">${
+                    model.charAt(0).toUpperCase() + model.slice(1)
+                  }:</h6>
+                  <div class="result-text">
+                    <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyText('${model}')" title="Copy">
+                      <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <pre id="${model}" class="mb-0" style="white-space: pre-wrap; background: none; border: none">${result}</pre>
+                  </div>
+                  ${
+                    data.evaluation
+                      ? `
+                    <div class="mt-1">
+                      <small class="text-muted">
+                        CER: ${(data.evaluation[model].cer * 100).toFixed(
+                          2
+                        )}% | 
+                        WER: ${(data.evaluation[model].wer * 100).toFixed(2)}%
+                      </small>
+                    </div>
+                  `
+                      : ""
+                  }
+                `;
+              }
+              allResultsContent.appendChild(resultDiv);
+            }
+
             document.getElementById("processedImage").src =
               data.processed_image;
             document
@@ -218,15 +359,14 @@
             document.querySelector(".loading").style.display = "none";
           }
         });
-      // Copy kết quả
-      document
-        .getElementById("copyBtn")
-        .addEventListener("click", function (e) {
-          e.preventDefault();
-          const text = document.getElementById("resultText").textContent;
-          navigator.clipboard.writeText(text);
-          showAlert("Đã copy kết quả vào clipboard!", "info");
-        });
+
+      // Copy text helper
+      function copyText(elementId) {
+        const text = document.getElementById(elementId).textContent;
+        navigator.clipboard.writeText(text);
+        showAlert("Đã copy kết quả vào clipboard!", "info");
+      }
+
       // Alert helper
       function showAlert(message, type) {
         const alertBox = document.getElementById("alertBox");
